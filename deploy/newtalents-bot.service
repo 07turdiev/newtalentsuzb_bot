@@ -1,0 +1,17 @@
+[Unit]
+Description=New Talents UZ - tanlov arizalari boti
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bot
+Group=bot
+WorkingDirectory=/opt/newtalentsuzb_bot
+ExecStart=/opt/newtalentsuzb_bot/.venv/bin/python -m bot
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
