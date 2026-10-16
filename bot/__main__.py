@@ -1,5 +1,14 @@
 """Ishga tushirish: python -m bot"""
 
+try:
+    # Operatsion tizim sertifikatlaridan foydalanish: HTTPS tekshiruvi bor tarmoqlarda
+    # (masalan, ishxona tarmog'i) shusiz SSL xatosi chiqadi. aiogram'dan oldin chaqirilishi shart.
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 import asyncio
 import logging
 
@@ -12,6 +21,7 @@ from aiogram.types import BotCommand
 from .config import load_config
 from .db import Database
 from .handlers import routers
+from .middlewares import LangMiddleware
 
 
 async def main() -> None:
@@ -26,12 +36,28 @@ async def main() -> None:
 
     bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage(), config=config, db=db)
+    dp.message.outer_middleware(LangMiddleware())
+    dp.callback_query.outer_middleware(LangMiddleware())
     dp.include_routers(*routers())
 
     await bot.set_my_commands([
         BotCommand(command="start", description="Asosiy menyu"),
         BotCommand(command="cancel", description="Bekor qilish"),
     ])
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Главное меню"),
+            BotCommand(command="cancel", description="Отмена"),
+        ],
+        language_code="ru",
+    )
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Main menu"),
+            BotCommand(command="cancel", description="Cancel"),
+        ],
+        language_code="en",
+    )
 
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())

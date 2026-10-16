@@ -1,14 +1,16 @@
 # New Talents UZ — tanlov arizalari boti
 
-Telegram bot tanlovni e'lon qiladi va ishtirokchilardan ariza qabul qiladi:
+Telegram bot tanlovni e'lon qiladi va ishtirokchilardan ariza hamda to'lov chekini qabul qiladi:
 
-- **Admin** tanlov yaratadi (nomi, e'lon matni/rasmi, muddat, yo'nalishlar, yosh toifalari),
-  uni kanalga joylaydi yoki bot foydalanuvchilariga tarqatadi.
-- **Ishtirokchi** «📝 Ariza topshirish» tugmasini bosib, anketani bosqichma-bosqich to'ldiradi:
-  yakka ijrochi yoki duet/ansambl/jamoa uchun.
-- Bot rasmiy **Word ariza shaklini** (`templates/`) avtomatik to'ldiradi va uni ishtirokchiga hamda
-  admin guruhiga yuboradi. Admin «✅ Qabul qilish» yoki «❌ Rad etish» tugmasini bosadi, ishtirokchiga
-  natija haqida xabar boradi.
+- **Uch til:** birinchi `/start` da ishtirokchi o'zbek, rus yoki ingliz tilini tanlaydi; keyin
+  «🌐 Til» tugmasi orqali o'zgartiradi. Admin panel o'zbekcha.
+- **Admin** tanlov yaratadi (nomi, rasm bilan e'lon, muddat, yo'nalishlar, yosh toifalari) va
+  belgilab qo'yib, e'lonni kanalga va/yoki barcha bot foydalanuvchilariga yuboradi.
+- **Ishtirokchi** «📝 Ariza yuborish» tugmasini bosib, anketani bosqichma-bosqich to'ldiradi
+  (yakka ijrochi yoki duet/ansambl/jamoa), so'ng to'lov qilib, **chekni** yuboradi.
+- Bot rasmiy **Word ariza shaklini** (`templates/`) avtomatik to'ldiradi. Chek kelgach, admin
+  guruhiga ariza va chek tushadi: «✅ Qabul qilish», «💳 To'lov qilinmagan» yoki «❌ Rad etish».
+  «To'lov qilinmagan» bosilsa, ishtirokchiga chekni qayta yuklash tugmasi bilan xabar boradi.
 - Barcha arizalarni **Excel** jadval yoki **ZIP** (Word fayllar) ko'rinishida yuklab olish mumkin.
 
 ## 1. Tayyorgarlik (bir marta)
@@ -92,25 +94,31 @@ to'xtating (`systemctl stop newtalents-bot`), aks holda `Conflict` xatosi chiqad
 
 ## 3. Admin uchun yo'riqnoma
 
-1. Botga `/start` → **⚙️ Admin panel** → **➕ Yangi tanlov e'lon qilish**. 6 qadam:
-   nomi → e'lon (rasm + matn yoki faqat matn) → muddat → yo'nalishlar → yosh toifalari → video
-   talab qilinadimi. Oldindan ko'rib, **Saqlash** ni bosing — ariza qabul qilish boshlanadi.
-2. Tanlov kartochkasida:
-   - **📢 Kanalga e'lon qilish** — e'lon «📝 Ariza topshirish» tugmasi bilan kanalga joylanadi;
+1. **⚙️ Admin panel** → **💳 To'lov ma'lumotlari** → karta raqami, karta egasi va summani kiriting.
+   Karta kiritilgan bo'lsa, ishtirokchi arizani tasdiqlagach to'lov rekvizitlarini ko'radi va chek
+   yuboradi; **🚫 To'lovni o'chirish** bosilsa, arizalar cheksiz yuboriladi.
+2. **➕ Yangi tanlov e'lon qilish** — 6 qadam: nomi → e'lon (**rasm majburiy**, matn rasm izohida)
+   → muddat → yo'nalishlar → yosh toifalari → video talab qilinadimi. Oldindan ko'rish ostida
+   ikkita belgilanadigan band bor: **Kanalga e'lon berish** va **Barcha bot foydalanuvchilariga
+   yuborish**. Belgilanganlariga yuboriladi; hech biri belgilanmasa, tanlov faqat saqlanadi.
+   Kanal postining ostida «📝 Ariza yuborish» va «🤖 Botga o'tish» tugmalari bo'ladi.
+3. Tanlov kartochkasida (keyinroq qayta e'lon qilish va boshqarish uchun):
+   - **📢 Kanalga e'lon qilish** — e'lon tugmalar bilan kanalga qayta joylanadi;
    - **📨 Bot foydalanuvchilariga yuborish** — botga kirgan hammaga yuboriladi;
    - **🔗 Ariza havolasi** — `https://t.me/<bot>?start=apply_N` havolasini Instagram, sayt va
      boshqa joylarga qo'yish mumkin: bosilganda to'g'ridan-to'g'ri ariza to'ldirish boshlanadi;
    - **📊 Excel jadval**, **📦 Barcha arizalar (ZIP)** — yuklab olish;
    - **⏳ Muddatni o'zgartirish**, **🔒 Qabulni yopish / 🔓 qayta ochish**.
-3. Har bir yangi ariza admin guruhiga Word fayl ko'rinishida keladi (video bo'lsa, unga javob
-   sifatida). **✅ Qabul qilish** / **❌ Rad etish** ni bosing — ishtirokchiga xabar boradi.
-   Tugmalarni faqat `ADMIN_IDS` dagi adminlar bosa oladi.
+4. Ishtirokchi chek yuborgach, admin guruhiga Word ariza va uning ostida chek keladi (video bo'lsa,
+   u ham). Chek ostidagi tugmalar: **✅ Qabul qilish**, **💳 To'lov qilinmagan**, **❌ Rad etish** —
+   ishtirokchiga o'z tilida xabar boradi. Tugmalarni faqat `ADMIN_IDS` dagi adminlar bosa oladi.
 
 ## 4. Moslashtirish
 
 | Nimani | Qayerda |
 |---|---|
-| Botdagi barcha matnlar va tugmalar | `bot/texts.py` |
+| Ishtirokchiga ko'rinadigan matnlar (uz/ru/en) | `bot/locales.py` |
+| Admin panel matnlari | `bot/texts.py` |
 | Anketa savollari, tartibi, majburiy/ixtiyoriyligi | `bot/forms.py` (`SOLO_FIELDS`, `TEAM_FIELDS`) |
 | Word shakllar | `templates/solo.docx`, `templates/team.docx` |
 

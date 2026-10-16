@@ -1,4 +1,7 @@
-"""Ariza shakli maydonlari, ularni tekshirish va ko'rsatish."""
+"""Ariza shakli maydonlari, ularni tekshirish va ko'rsatish.
+
+Maydon nomlari va savollar matni locales.py da (f.<kalit>, f.<kalit>.prompt).
+"""
 
 from __future__ import annotations
 
@@ -10,9 +13,9 @@ from typing import Any
 
 from aiogram.types import Message
 
-from . import texts
 from .config import now
 from .db import Contest
+from .locales import t
 
 MAX_PARTICIPANTS = 100
 
@@ -20,96 +23,39 @@ MAX_PARTICIPANTS = 100
 @dataclass(frozen=True)
 class Field:
     key: str
-    label: str  # tasdiqlash oynasi va Excel ustuni uchun
-    prompt: str
     type: str = "text"  # text | date | choice | phone | list | video
     optional: bool = False
     max_len: int = 200
-    free_prompt: str = ""  # choice: tanlov uchun ro'yxat berilmagan bo'lsa
+
+    def label(self, lang: str) -> str:
+        return t(lang, f"f.{self.key}")
+
+    def prompt(self, lang: str, options: list[str]) -> str:
+        if self.type == "choice" and not options:
+            return t(lang, f"f.{self.key}.free")
+        if self.type == "phone":
+            text = t(lang, "f.phone.prompt", btn=t(lang, "btn.phone"))
+        else:
+            text = t(lang, f"f.{self.key}.prompt")
+        if self.optional:
+            text += t(lang, "optional_hint", skip=t(lang, "btn.skip"))
+        return text
 
 
-FULL_NAME = Field(
-    "full_name",
-    "F.I.Sh.",
-    "Ishtirokchining familiyasi, ismi va otasining ismini yozing:\n"
-    "<i>Masalan: Karimova Madina Rustamovna</i>",
-)
-BIRTH_DATE = Field(
-    "birth_date",
-    "Tug'ilgan sana",
-    "Tug'ilgan sanasini kun.oy.yil ko'rinishida yozing:\n<i>Masalan: 05.03.2012</i>",
-    type="date",
-)
-TEAM_NAME = Field(
-    "team_name",
-    "Jamoa / ansambl nomi",
-    "Jamoa yoki ansambl nomini yozing:\n<i>Masalan: «Navo» xalq cholg'ulari ansambli</i>",
-)
-PARTICIPANTS = Field(
-    "participants",
-    "Ishtirokchilar",
-    "Har bir ishtirokchining familiyasi, ismi va otasining ismini <b>alohida qatorda</b> yozing:\n"
-    "<i>Karimova Madina Rustamovna\nAliyev Jasur Akmalovich</i>",
-    type="list",
-    max_len=150,
-)
-INSTITUTION = Field(
-    "institution",
-    "Ta'lim muassasasi",
-    "Tahsil olayotgan ta'lim muassasasini yozing (o'quvchi va talabalar uchun):\n"
-    "<i>Masalan: Toshkent shahar 1-son bolalar musiqa va san'at maktabi</i>",
-    optional=True,
-    max_len=300,
-)
-DIRECTION = Field(
-    "direction",
-    "Yo'nalish",
-    "Ishtirok etadigan yo'nalishni tanlang:",
-    type="choice",
-    free_prompt="Ishtirok etadigan yo'nalish nomini yozing:",
-)
-AGE_CATEGORY = Field(
-    "age_category",
-    "Yosh toifasi",
-    "Ishtirok etadigan yosh toifasini tanlang:",
-    type="choice",
-    free_prompt="Ishtirok etadigan yosh toifasini yozing:",
-)
-PIECE = Field(
-    "piece",
-    "Asar nomi va muallifi",
-    "Ijro etiladigan asar nomi va muallifini yozing:\n<i>Masalan: «Bahor valsi» — F. Shopen</i>",
-    max_len=500,
-)
-TEACHER = Field("teacher", "O'qituvchi", "O'qituvchisining F.I.Sh.:", optional=True)
-ACCOMPANIST = Field("accompanist", "Konsertmeyster", "Konsertmeysterining F.I.Sh.:", optional=True)
-PARENTS = Field(
-    "parents",
-    "Ota-onasi",
-    "Otasi va onasining F.I.Sh.:\n<i>Masalan: Karimov Rustam Aliyevich, Karimova Dilnoza Ahmedovna</i>",
-    optional=True,
-    max_len=300,
-)
-HEAD = Field(
-    "head",
-    "Muassasa rahbari",
-    "Ta'lim muassasasi rahbarining F.I.Sh. (o'quvchi va talabalar uchun):",
-    optional=True,
-)
-PHONE = Field(
-    "phone",
-    "Telefon",
-    f"Ishtirokchining telefon raqami: «{texts.BTN_PHONE}» tugmasini bosing yoki qo'lda yozing.\n"
-    "<i>Masalan: +998 90 123 45 67</i>",
-    type="phone",
-)
-VIDEO = Field(
-    "video",
-    "Ijro videosi",
-    "Ijro videosini yuboring: video faylni shu yerga tashlang yoki havolasini yozing "
-    "(YouTube, Google Drive va h.k.).",
-    type="video",
-)
+FULL_NAME = Field("full_name")
+BIRTH_DATE = Field("birth_date", type="date")
+TEAM_NAME = Field("team_name")
+PARTICIPANTS = Field("participants", type="list", max_len=150)
+INSTITUTION = Field("institution", optional=True, max_len=300)
+DIRECTION = Field("direction", type="choice")
+AGE_CATEGORY = Field("age_category", type="choice")
+PIECE = Field("piece", max_len=500)
+TEACHER = Field("teacher", optional=True)
+ACCOMPANIST = Field("accompanist", optional=True)
+PARENTS = Field("parents", optional=True, max_len=300)
+HEAD = Field("head", optional=True)
+PHONE = Field("phone", type="phone")
+VIDEO = Field("video", type="video")
 
 SOLO_FIELDS = (
     FULL_NAME, BIRTH_DATE, INSTITUTION, DIRECTION, AGE_CATEGORY, PIECE,
@@ -135,48 +81,47 @@ def options_for(field: Field, contest: Contest) -> list[str]:
     return []
 
 
-def prompt_for(field: Field, options: list[str]) -> str:
-    if field.type == "choice" and not options:
-        return field.free_prompt
-    text = field.prompt
-    if field.optional:
-        text += texts.OPTIONAL_HINT
-    return text
-
-
 # --- tekshirish ---
 
 
 class FormError(Exception):
-    pass
+    """Tekshiruv xatosi: key — locales.py dagi xabar kaliti."""
+
+    def __init__(self, key: str, **params: Any) -> None:
+        super().__init__(key)
+        self.key = key
+        self.params = params
+
+    def text(self, lang: str) -> str:
+        return t(lang, self.key, **self.params)
 
 
 def clean_text(text: str, max_len: int, min_len: int = 2) -> str:
     text = " ".join(text.split())
     if len(text) < min_len:
-        raise FormError(texts.ERR_SHORT)
+        raise FormError("err.short")
     if len(text) > max_len:
-        raise FormError(texts.ERR_LONG.format(n=max_len))
+        raise FormError("err.long", n=max_len)
     return text
 
 
 def parse_date(text: str) -> date:
     m = re.fullmatch(r"\s*(\d{1,2})\s*[./\-,]\s*(\d{1,2})\s*[./\-,]\s*(\d{4})\s*", text)
     if not m:
-        raise FormError(texts.ERR_DATE)
+        raise FormError("err.date")
     day, month, year = map(int, m.groups())
     try:
         return date(year, month, day)
     except ValueError:
-        raise FormError(texts.ERR_DATE)
+        raise FormError("err.date")
 
 
 def parse_birth_date(text: str) -> str:
     value = parse_date(text)
     if value > now().date():
-        raise FormError(texts.ERR_DATE_FUTURE)
+        raise FormError("err.date_future")
     if value.year < 1920:
-        raise FormError(texts.ERR_DATE)
+        raise FormError("err.date")
     return value.strftime("%d.%m.%Y")
 
 
@@ -185,9 +130,9 @@ def normalize_phone(text: str) -> str:
     if len(digits) == 9:  # 90 123 45 67
         digits = "998" + digits
     if digits.startswith("998") and len(digits) != 12:
-        raise FormError(texts.ERR_PHONE)
+        raise FormError("err.phone")
     if not 10 <= len(digits) <= 15:
-        raise FormError(texts.ERR_PHONE)
+        raise FormError("err.phone")
     return digits
 
 
@@ -207,12 +152,12 @@ def parse_list(text: str, max_len: int) -> list[str]:
         if line:
             names.append(line)
     if len(names) < 2:
-        raise FormError(texts.ERR_PARTICIPANTS)
+        raise FormError("err.participants")
     if len(names) > MAX_PARTICIPANTS:
-        raise FormError(texts.ERR_PARTICIPANTS_MANY.format(n=MAX_PARTICIPANTS))
+        raise FormError("err.participants_many", n=MAX_PARTICIPANTS)
     for name in names:
         if len(name) > max_len:
-            raise FormError(texts.ERR_LONG.format(n=max_len))
+            raise FormError("err.long", n=max_len)
     return names
 
 
@@ -224,7 +169,7 @@ def parse_video(message: Message) -> dict[str, str]:
     text = (message.text or "").strip()
     if re.match(r"https?://\S+$", text):
         return {"type": "link", "url": text[:500]}
-    raise FormError(texts.ERR_VIDEO)
+    raise FormError("err.video")
 
 
 def parse_answer(field: Field, message: Message, options: list[str]) -> Any:
@@ -235,7 +180,7 @@ def parse_answer(field: Field, message: Message, options: list[str]) -> Any:
 
     text = (message.text or "").strip()
     if not text:
-        raise FormError(texts.ERR_TEXT)
+        raise FormError("err.text")
 
     if field.type == "phone":
         return normalize_phone(text)
@@ -245,7 +190,7 @@ def parse_answer(field: Field, message: Message, options: list[str]) -> Any:
         return parse_list(text, field.max_len)
     if field.type == "choice" and options:
         if text not in options:
-            raise FormError(texts.ERR_CHOICE)
+            raise FormError("err.choice")
         return text
     return clean_text(text, field.max_len)
 
@@ -253,7 +198,7 @@ def parse_answer(field: Field, message: Message, options: list[str]) -> Any:
 # --- ko'rsatish ---
 
 
-def display(field: Field, value: Any) -> str:
+def display(field: Field, value: Any, lang: str = "uz") -> str:
     """Qiymatni oddiy matn ko'rinishida qaytaradi (HTML ekranlanmagan)."""
     if value in (None, "", []):
         return "—"
@@ -262,24 +207,44 @@ def display(field: Field, value: Any) -> str:
     if field.type == "list":
         return "\n".join(f"{i}. {name}" for i, name in enumerate(value, 1))
     if field.type == "video":
-        return value["url"] if value["type"] == "link" else "video fayl yuborilgan"
+        return value["url"] if value["type"] == "link" else t(lang, "video_sent")
     return str(value)
 
 
-def summary_html(contest: Contest, kind: str, answers: dict[str, Any]) -> str:
+def summary_html(contest: Contest, kind: str, answers: dict[str, Any], lang: str) -> str:
     lines = [
-        f"🏆 Tanlov: <b>{escape(contest.title)}</b>",
-        f"Turi: <b>{texts.KIND_LABELS[kind]}</b>",
+        f"🏆 {t(lang, 'summary.contest')}: <b>{escape(contest.title)}</b>",
+        f"{t(lang, 'summary.kind')}: <b>{t(lang, f'kind.{kind}')}</b>",
         "",
     ]
     for field in fields_for(kind, contest):
         value = answers.get(field.key)
+        label = field.label(lang)
         if field.type == "list" and value:
             shown = value[:30]
             body = "\n".join(f"   {i}. {escape(name)}" for i, name in enumerate(shown, 1))
             if len(value) > len(shown):
-                body += f"\n   … yana {len(value) - len(shown)} nafar"
-            lines.append(f"<b>{field.label}</b> ({len(value)} nafar):\n{body}")
+                body += "\n   " + t(lang, "summary.more", n=len(value) - len(shown))
+            lines.append(f"<b>{label}</b> ({len(value)} {t(lang, 'summary.persons')}):\n{body}")
         else:
-            lines.append(f"<b>{field.label}:</b> {escape(display(field, value))}")
+            lines.append(f"<b>{label}:</b> {escape(display(field, value, lang))}")
     return "\n".join(lines)
+
+
+def payment_details(payment: dict[str, str], lang: str) -> str:
+    """To'lov rekvizitlari (HTML): summa, karta raqami, karta egasi."""
+    lines = []
+    if payment.get("amount"):
+        lines.append(f"{t(lang, 'pay.amount')}: <b>{escape(payment['amount'])}</b>")
+    lines.append(f"{t(lang, 'pay.card')}: <code>{escape(payment['card'])}</code>")
+    if payment.get("holder"):
+        lines.append(f"{t(lang, 'pay.holder')}: {escape(payment['holder'])}")
+    return "\n".join(lines)
+
+
+def parse_card(text: str) -> str:
+    """Karta raqamini tekshiradi va 4 tadan guruhlab qaytaradi: 8600 1234 5678 9012."""
+    digits = re.sub(r"\D", "", text)
+    if not 16 <= len(digits) <= 19:
+        raise FormError("err.card")
+    return " ".join(digits[i : i + 4] for i in range(0, len(digits), 4))

@@ -9,9 +9,9 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from . import texts
 from .db import Application, Contest
 from .forms import ALL_FIELDS, display
+from .locales import t
 
 COLUMNS = (
     ("№", 7),
@@ -31,7 +31,8 @@ COLUMNS = (
     ("Muassasa rahbari", 26),
     ("Telefon", 18),
     ("Ijro videosi", 30),
-    ("Holat", 18),
+    ("To'lov cheki", 17),
+    ("Holat", 24),
     ("Telegram ID", 14),
 )
 KIND_SHORT = {"solo": "Yakka", "team": "Jamoaviy"}
@@ -62,7 +63,8 @@ def _row(app: Application) -> list:
         show("head"),
         show("phone"),
         show("video") if d.get("video") else "",
-        texts.STATUS.get(app.status, app.status).split(" ", 1)[-1],
+        app.receipt["at"][:16] if app.receipt else "",
+        t("uz", f"status.{app.status}").split(" ", 1)[-1],
         app.user_id,
     ]
 

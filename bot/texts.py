@@ -1,98 +1,14 @@
-"""Botdagi barcha matnlar shu yerda. Matnni o'zgartirish uchun faqat shu faylni tahrirlang."""
+"""Admin panel matnlari (o'zbekcha). Ishtirokchilarga ko'rinadigan matnlar — locales.py da."""
 
-# --- Tugmalar ---
-BTN_APPLY = "📝 Ariza topshirish"
-BTN_CONTESTS = "🏆 Tanlovlar"
-BTN_MY_APPS = "📋 Mening arizalarim"
 BTN_ADMIN = "⚙️ Admin panel"
-BTN_CANCEL = "❌ Bekor qilish"
-BTN_BACK = "⬅️ Orqaga"
 BTN_SKIP = "⏭ O'tkazib yuborish"
-BTN_PHONE = "📱 Raqamni yuborish"
+BTN_CANCEL = "❌ Bekor qilish"
 
-KIND_LABELS = {
-    "solo": "👤 Yakka ijrochi",
-    "team": "👥 Duet, ansambl yoki jamoa",
-}
-
-STATUS = {
-    "new": "🆕 Ko'rib chiqilmoqda",
-    "accepted": "✅ Qabul qilindi",
-    "rejected": "❌ Rad etildi",
-}
-
-# --- Foydalanuvchi ---
-WELCOME = (
-    "Assalomu alaykum, {name}!\n\n"
-    "Bu bot orqali ijodiy tanlovlarga ariza topshirishingiz mumkin.\n\n"
-    f"{BTN_APPLY} — ochiq tanlovga ariza to'ldirish\n"
-    f"{BTN_CONTESTS} — e'lon qilingan tanlovlar\n"
-    f"{BTN_MY_APPS} — yuborgan arizalaringiz va ularning holati"
-)
-CANCELLED = "Bekor qilindi. Asosiy menyu:"
-NO_CONTESTS = (
-    "Hozircha ariza qabul qilinayotgan tanlov yo'q.\n"
-    "Yangi tanlov e'lon qilinganda shu bot orqali xabar beramiz."
-)
-CHOOSE_CONTEST = "Qaysi tanlovga ariza topshirasiz?"
-CONTEST_CLOSED = "Kechirasiz, bu tanlovga ariza qabul qilish yakunlangan."
-NO_APPS = "Siz hali ariza topshirmagansiz."
-MY_APPS_HEAD = "📋 <b>Sizning arizalaringiz</b>\n"
-MY_APPS_HINT = "\nTo'ldirilgan ariza shaklini olish uchun raqamini bosing."
-DOC_NOT_FOUND = "Ariza fayli topilmadi."
-STALE_BUTTON = "Bu tugma faol emas."
-
-# --- Ariza to'ldirish ---
-FORM_STARTED = (
-    "📝 <b>{title}</b> tanloviga ariza to'ldirish boshlandi.\n"
-    f"To'xtatish uchun istalgan vaqtda «{BTN_CANCEL}» tugmasini bosing."
-)
-CHOOSE_KIND = "Ishtirok turini tanlang:"
-USE_BUTTONS = "Iltimos, yuqoridagi tugmalardan birini tanlang."
-OPTIONAL_HINT = f"\n\n<i>Ixtiyoriy: bo'lmasa «{BTN_SKIP}» tugmasini bosing.</i>"
-CHECK_DATA = "🔎 <b>Ma'lumotlarni tekshiring</b>\n\n"
-CONSENT = (
-    "Hammasi to'g'rimi?\n\n"
-    "«✅ Tasdiqlash» tugmasini bosib, siz ma'lumotlar to'g'riligini tasdiqlaysiz va ularni "
-    "tanlov tashkilotchilariga qayta ishlash uchun berishga <b>rozilik</b> bildirasiz "
-    "(ariza shaklidagi «розилик имзоси» o'rniga)."
-)
-BTN_CONFIRM = "✅ Tasdiqlash va yuborish"
-BTN_EDIT = "✏️ Tahrirlash"
-EDIT_WHICH = "Qaysi ma'lumotni o'zgartirasiz?"
-SUBMITTED = (
-    "✅ <b>Arizangiz qabul qilindi!</b>\n"
-    "Ariza raqami: <b>№{id}</b>\n\n"
-    "To'ldirilgan ariza shakli ilova qilindi. Ariza ko'rib chiqilgach, natijasini shu bot "
-    "orqali xabar qilamiz."
-)
-SUBMIT_FAILED = (
-    "Arizani saqlashda xatolik yuz berdi. Iltimos, birozdan so'ng qayta urinib ko'ring."
-)
-USER_STATUS = {
-    "accepted": "✅ <b>{title}</b> tanloviga yuborgan №{id} arizangiz <b>qabul qilindi</b>.",
-    "rejected": (
-        "❌ <b>{title}</b> tanloviga yuborgan №{id} arizangiz <b>rad etildi</b>.\n"
-        "Savollar bo'lsa, tanlov tashkilotchilariga murojaat qiling."
-    ),
-}
-
-# --- Tekshiruv xatolari ---
-ERR_TEXT = "Iltimos, javobni matn ko'rinishida yozing."
-ERR_SHORT = "Juda qisqa. Iltimos, to'liqroq yozing."
-ERR_LONG = "Juda uzun: ko'pi bilan {n} ta belgi bo'lishi mumkin."
-ERR_DATE = "Sana noto'g'ri. Kun.oy.yil ko'rinishida yozing, masalan: <code>05.03.2012</code>"
-ERR_DATE_FUTURE = "Tug'ilgan sana kelajakda bo'lishi mumkin emas."
-ERR_PHONE = "Telefon raqami noto'g'ri. Masalan: <code>+998 90 123 45 67</code>"
-ERR_CHOICE = "Iltimos, pastdagi tugmalardan birini tanlang."
-ERR_PARTICIPANTS = "Kamida 2 nafar ishtirokchini yozing, har birini alohida qatorda."
-ERR_PARTICIPANTS_MANY = "Ishtirokchilar soni {n} tadan oshmasligi kerak."
-ERR_VIDEO = "Video fayl yuboring yoki <code>https://</code> bilan boshlanadigan havola yozing."
-
-# --- Admin ---
+# --- Admin panel ---
 ADMIN_PANEL = "⚙️ <b>Admin panel</b>"
 BTN_NEW_CONTEST = "➕ Yangi tanlov e'lon qilish"
 BTN_CONTEST_LIST = "🏆 Tanlovlar va arizalar"
+BTN_PAYMENT = "💳 To'lov ma'lumotlari"
 BTN_STATS = "📊 Statistika"
 STATS = (
     "📊 <b>Statistika</b>\n\n"
@@ -102,7 +18,9 @@ STATS = (
 )
 NO_CONTESTS_ADMIN = "Hali tanlov yaratilmagan."
 CONTESTS_HEAD = "🏆 <b>Tanlovlar</b>\n🟢 — ariza qabul qilinmoqda, 🔴 — yopiq"
+CANCELLED = "Bekor qilindi."
 
+# --- Yangi tanlov ---
 NC_TITLE = (
     "<b>1/6. Tanlov nomi</b>\n\n"
     "Tanlov nomini qo'shtirnoqsiz yozing. Ariza shaklida u "
@@ -110,12 +28,13 @@ NC_TITLE = (
     "Masalan: <code>Yangi iste'dodlar</code>"
 )
 NC_ANNOUNCEMENT = (
-    "<b>2/6. E'lon matni</b>\n\n"
-    "Kanalga va foydalanuvchilarga yuboriladigan e'lonni yuboring. Rasm bilan "
-    "(matnni rasm izohiga yozing) yoki faqat matn bo'lishi mumkin. Qalin, kursiv va "
-    "havolalar saqlanadi.\n\n"
-    "E'lon ostiga «📝 Ariza topshirish» tugmasi avtomatik qo'shiladi."
+    "<b>2/6. E'lon: rasm va matn</b>\n\n"
+    "Tanlov <b>rasmini</b> yuboring va e'lon matnini rasm <b>izohiga</b> yozing "
+    "(Telegram cheklovi: 1024 belgigacha). Qalin, kursiv va havolalar saqlanadi.\n\n"
+    "E'lon ostiga «📝 Ariza yuborish» tugmasi avtomatik qo'shiladi."
 )
+NC_ERR_PHOTO = "Tanlov rasmi majburiy: rasmni yuboring va e'lon matnini uning izohiga yozing."
+NC_ERR_CAPTION = "Rasm izohiga e'lon matnini ham yozing (rasmni qayta yuboring)."
 NC_DEADLINE = (
     "<b>3/6. Ariza qabul qilish muddati</b>\n\n"
     "Oxirgi kunni kun.oy.yil ko'rinishida yozing, masalan: <code>31.10.2026</code>\n"
@@ -142,15 +61,21 @@ NC_VIDEO = (
 NC_VIDEO_YES = "🎬 Ha, talab qilinsin"
 NC_VIDEO_NO = "Yo'q"
 NC_PREVIEW_HEAD = "👆 E'lon shunday ko'rinadi.\n\n"
-NC_SAVE = "✅ Saqlash va qabulni ochish"
+NC_PUBLISH_HINT = (
+    "\n\n<b>E'lon qayerga yuborilsin?</b> Kerakli bandlarni belgilang. "
+    "Hech biri belgilanmasa, tanlov faqat saqlanadi va e'lon yuborilmaydi."
+)
+NC_TOGGLE_CHANNEL = "Kanalga e'lon berish"
+NC_TOGGLE_BROADCAST = "Barcha bot foydalanuvchilariga yuborish"
+NC_SAVE_PUBLISH = "✅ Saqlash va e'lon qilish"
+NC_SAVE_ONLY = "✅ Saqlash (e'lonsiz)"
 NC_SAVED = "✅ Tanlov saqlandi, arizalar qabul qilinmoqda."
 NC_ERR_TITLE = "Nom 3–150 belgi oralig'ida bo'lishi kerak."
-NC_ERR_ANNOUNCEMENT = "E'lonni matn yoki rasm (izohi bilan) ko'rinishida yuboring."
 NC_ERR_DEADLINE_PAST = "Muddat bugundan oldin bo'lishi mumkin emas."
-NC_ERR_LIST = "Ro'yxatni matn ko'rinishida, har bir bandni alohida qatorda yozing."
 NC_ERR_LIST_ITEM = "Har bir band 1–100 belgi, jami ko'pi bilan 30 ta bo'lishi kerak."
 NC_UNEXPECTED = "Kutilgan javob emas. Ko'rsatmaga qarab yuboring yoki «❌ Bekor qilish»ni bosing."
 
+# --- Tanlov kartochkasi ---
 BTN_POST_CHANNEL = "📢 Kanalga e'lon qilish"
 BTN_BROADCAST = "📨 Bot foydalanuvchilariga yuborish"
 BTN_PREVIEW = "👁 E'lonni ko'rish"
@@ -163,6 +88,7 @@ BTN_TO_LIST = "⬅️ Tanlovlar ro'yxati"
 BTN_TO_MENU = "⬅️ Admin panel"
 BTN_YES_SEND = "✅ Ha, yuborilsin"
 BTN_NO = "Yo'q"
+BTN_OPEN_BOT = "🤖 Botga o'tish"
 
 CONTEST_CARD = (
     "🏆 <b>{title}</b>\n\n"
@@ -172,7 +98,9 @@ CONTEST_CARD = (
     "Yosh toifalari: {ages}\n"
     "Ijro videosi: {video}\n\n"
     "📥 Arizalar: <b>{total}</b> (yakka: {solo}, jamoaviy: {team})\n"
-    "🆕 ko'rilmagan: {new} · ✅ qabul: {accepted} · ❌ rad: {rejected}\n\n"
+    "💳 chek kutilmoqda: {awaiting_payment} · 🆕 ko'rilmagan: {new} · "
+    "⚠️ to'lov tasdiqlanmagan: {unpaid}\n"
+    "✅ qabul: {accepted} · ❌ rad: {rejected}\n\n"
     "🔗 Ariza havolasi:\n{link}"
 )
 STATE_OPEN = "🟢 Ariza qabul qilinmoqda"
@@ -189,13 +117,11 @@ EDIT_DEADLINE = (
     f"Muddatsiz qilish uchun — «{BTN_SKIP}»."
 )
 DEADLINE_SAVED = "✅ Muddat yangilandi."
-NO_CHANNEL ="Kanal sozlanmagan: .env faylida CHANNEL_ID ni kiriting va botni qayta ishga tushiring."
+NO_CHANNEL = "Kanal sozlanmagan: .env faylida CHANNEL_ID ni kiriting va botni qayta ishga tushiring."
 POSTED = "✅ E'lon kanalga joylandi."
 POST_FAILED = "Kanalga yuborib bo'lmadi. Bot kanalga admin qilib qo'shilganini tekshiring.\n\n{error}"
-BROADCAST_CONFIRM = (
-    "📨 E'lon <b>{n}</b> nafar bot foydalanuvchisiga yuboriladi. Davom etasizmi?"
-)
-BROADCAST_STARTED = "Yuborish boshlandi. Tugagach, natijani xabar qilaman."
+BROADCAST_CONFIRM = "📨 E'lon <b>{n}</b> nafar bot foydalanuvchisiga yuboriladi. Davom etasizmi?"
+BROADCAST_STARTED = "📨 Bot foydalanuvchilariga yuborish boshlandi. Tugagach, natijani xabar qilaman."
 BROADCAST_DONE = (
     "📨 <b>{title}</b> e'loni yuborildi.\n"
     "Yetkazildi: <b>{sent}</b>\nYetkazilmadi: {failed}"
@@ -206,8 +132,44 @@ ZIP_TOO_BIG = (
     "data/applications/{id}/ papkasida saqlangan."
 )
 
+# --- To'lov ma'lumotlari ---
+PAYMENT_INFO = (
+    "💳 <b>To'lov ma'lumotlari</b>\n\n"
+    "Karta raqami: {card}\n"
+    "Karta egasi: {holder}\n"
+    "To'lov summasi: {amount}\n\n"
+    "{state}"
+)
+PAYMENT_ON = (
+    "🟢 To'lov yoqilgan: ishtirokchi arizani tasdiqlagach, shu rekvizitlarni ko'radi va "
+    "to'lov chekini yuboradi."
+)
+PAYMENT_OFF = "⚪️ To'lov o'chirilgan: arizalar chek so'ralmasdan to'g'ridan-to'g'ri yuboriladi."
+NOT_SET = "—"
+BTN_PAYMENT_EDIT = "✏️ Kiritish / o'zgartirish"
+BTN_PAYMENT_OFF = "🚫 To'lovni o'chirish"
+PAY_CARD = (
+    "<b>1/3. Karta raqami</b>\n\n"
+    "To'lov qabul qilinadigan karta raqamini yozing, masalan: <code>8600 1234 5678 9012</code>"
+)
+PAY_HOLDER = f"<b>2/3. Karta egasi</b>\n\nKarta egasining ismini yozing yoki «{BTN_SKIP}»."
+PAY_AMOUNT = (
+    "<b>3/3. To'lov summasi</b>\n\n"
+    "Ishtirokchiga ko'rsatiladigan summani yozing, masalan: <code>200 000 so'm</code> "
+    "yoki <code>Yakka — 200 000 so'm, jamoa — 350 000 so'm</code>.\n"
+    f"Ko'rsatmaslik uchun — «{BTN_SKIP}»."
+)
+PAY_SAVED = "✅ To'lov ma'lumotlari saqlandi."
+PAY_DISABLED = "To'lov o'chirildi."
+PAY_ERR_TEXT = "1–200 belgi oralig'ida yozing."
+
+# --- Arizani ko'rib chiqish ---
 BTN_ACCEPT = "✅ Qabul qilish"
+BTN_UNPAID = "💳 To'lov qilinmagan"
 BTN_REJECT = "❌ Rad etish"
 NEW_APPLICATION = "📥 <b>Yangi ariza №{id}</b>"
+DOC_CAPTION = "📄 Ariza №{id} — to'ldirilgan shakl"
 VIDEO_CAPTION = "🎬 Ariza №{id} — ijro videosi"
+RECEIPT_ATTACHED = "💳 To'lov cheki ilova qilingan"
+RECEIPT_RESENT = "🔁 To'lov cheki qayta yuborildi"
 ALREADY_STATUS = "Holat allaqachon shunday."

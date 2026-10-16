@@ -1,4 +1,4 @@
-"""Admin panel: tanlov yaratish va e'lon qilish, arizalarni ko'rish, qabul qilish/rad etish."""
+"""Admin panel: tanlov yaratish va e'lon qilish, to'lov rekvizitlari, arizalarni ko'rib chiqish."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from .. import texts
 from ..config import Config, now
 from ..db import Contest, Database
 from ..filters import IsAdmin
+from ..locales import t
 
 router = Router(name="admin")
 router.message.filter(IsAdmin(), F.chat.type == ChatType.PRIVATE)
@@ -40,6 +41,12 @@ class ContestForm(StatesGroup):
 
 class EditContest(StatesGroup):
     deadline = State()
+
+
+class PaymentForm(StatesGroup):
+    card = State()
+    holder = State()
+    amount = State()
 
 
 # --- panel ---
@@ -81,6 +88,94 @@ async def contest_list(callback: CallbackQuery, db: Database) -> None:
     await callback.message.edit_text(texts.CONTESTS_HEAD, reply_markup=kb.contests_list(contests))
 
 
+# --- to'lov ma'lumotlari ---
+
+
+def _payment_text(payment: dict | None) -> str:
+    payment = payment or {}
+    return texts.PAYMENT_INFO.format(
+        card=f"<code>{escape(payment['card'])}</code>" if payment.get("card") else texts.NOT_SET,
+        holder=escape(payment.get("holder") or texts.NOT_SET),
+        amount=escape(payment.get("amount") or texts.NOT_SET),
+        state=texts.PAYMENT_ON if payment.get("card") else texts.PAYMENT_OFF,
+    )
+
+
+@router.callback_query(kb.AdminCb.filter(F.action == "pay"))
+async def payment_info(callback: CallbackQuery, db: Database) -> None:
+    payment = await db.get_payment()
+    await callback.answer()
+    await callback.message.edit_text(_payment_text(payment), reply_markup=kb.payment_settings(payment is not None))
+
+
+@router.callback_query(kb.AdminCb.filter(F.action == "pay_off"))
+async def payment_off(callback: CallbackQuery, db: Database) -> None:
+    await db.delete_setting("payment")
+    await callback.answer(texts.PAY_DISABLED)
+    await callback.message.edit_text(_payment_text(None), reply_markup=kb.payment_settings(False))
+
+
+@router.callback_query(kb.AdminCb.filter(F.action == "pay_edit"))
+async def payment_edit(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await state.clear()
+    await state.set_state(PaymentForm.card)
+    await callback.message.answer(texts.PAY_CARD, reply_markup=kb.cancel_only())
+
+
+@router.message(PaymentForm.card, F.text)
+async def payment_card(message: Message, state: FSMContext) -> None:
+    try:
+        card = forms.parse_card(message.text)
+    except forms.FormError as error:
+        await message.answer(error.text("uz"))
+        return
+    await state.update_data(card=card)
+    await state.set_state(PaymentForm.holder)
+    await message.answer(texts.PAY_HOLDER, reply_markup=kb.skip_cancel())
+
+
+def _optional_text(text: str) -> str | None:
+    if text == texts.BTN_SKIP:
+        return None
+    text = " ".join(text.split())
+    if not 1 <= len(text) <= 200:
+        raise forms.FormError("err.long", n=200)
+    return text
+
+
+@router.message(PaymentForm.holder, F.text)
+async def payment_holder(message: Message, state: FSMContext) -> None:
+    try:
+        holder = _optional_text(message.text)
+    except forms.FormError:
+        await message.answer(texts.PAY_ERR_TEXT)
+        return
+    await state.update_data(holder=holder)
+    await state.set_state(PaymentForm.amount)
+    await message.answer(texts.PAY_AMOUNT)
+
+
+@router.message(PaymentForm.amount, F.text)
+async def payment_amount(message: Message, state: FSMContext, db: Database, lang: str) -> None:
+    try:
+        amount = _optional_text(message.text)
+    except forms.FormError:
+        await message.answer(texts.PAY_ERR_TEXT)
+        return
+    data = await state.get_data()
+    await state.clear()
+    payment = {"card": data["card"], "holder": data.get("holder"), "amount": amount}
+    await db.set_setting("payment", payment)
+    await message.answer(texts.PAY_SAVED, reply_markup=kb.main_menu(lang, True))
+    await message.answer(_payment_text(payment), reply_markup=kb.payment_settings(True))
+
+
+@router.message(StateFilter(PaymentForm))
+async def payment_unexpected(message: Message) -> None:
+    await message.answer(texts.NC_UNEXPECTED)
+
+
 # --- yangi tanlov ---
 
 
@@ -103,16 +198,20 @@ async def nc_title(message: Message, state: FSMContext) -> None:
     await message.answer(texts.NC_ANNOUNCEMENT)
 
 
-@router.message(ContestForm.announcement, F.text | F.photo)
+@router.message(ContestForm.announcement, F.photo)
 async def nc_announcement(message: Message, state: FSMContext) -> None:
     announcement = message.html_text or ""
-    photo_id = message.photo[-1].file_id if message.photo else None
-    if not announcement.strip() and photo_id is None:
-        await message.answer(texts.NC_ERR_ANNOUNCEMENT)
+    if not announcement.strip():
+        await message.answer(texts.NC_ERR_CAPTION)
         return
-    await state.update_data(announcement=announcement, photo_id=photo_id)
+    await state.update_data(announcement=announcement, photo_id=message.photo[-1].file_id)
     await state.set_state(ContestForm.deadline)
     await message.answer(texts.NC_DEADLINE, reply_markup=kb.skip_cancel())
+
+
+@router.message(ContestForm.announcement)
+async def nc_announcement_no_photo(message: Message) -> None:
+    await message.answer(texts.NC_ERR_PHOTO)
 
 
 @router.message(ContestForm.deadline, F.text)
@@ -123,7 +222,7 @@ async def nc_deadline(message: Message, state: FSMContext) -> None:
         try:
             deadline = forms.parse_date(message.text)
         except forms.FormError as error:
-            await message.answer(str(error))
+            await message.answer(error.text("uz"))
             return
         if deadline < now().date():
             await message.answer(texts.NC_ERR_DEADLINE_PAST)
@@ -137,7 +236,7 @@ def _parse_items(text: str) -> list[str]:
     items = [" ".join(line.split()) for line in text.splitlines()]
     items = list(dict.fromkeys(i for i in items if i))  # bo'sh va takrorlarni olib tashlash
     if not items or len(items) > 30 or any(len(i) > 100 for i in items):
-        raise forms.FormError(texts.NC_ERR_LIST_ITEM)
+        raise ValueError
     return items
 
 
@@ -145,8 +244,8 @@ def _parse_items(text: str) -> list[str]:
 async def nc_directions(message: Message, state: FSMContext) -> None:
     try:
         directions = [] if message.text == texts.BTN_SKIP else _parse_items(message.text)
-    except forms.FormError as error:
-        await message.answer(str(error))
+    except ValueError:
+        await message.answer(texts.NC_ERR_LIST_ITEM)
         return
     await state.update_data(directions=directions)
     await state.set_state(ContestForm.ages)
@@ -157,8 +256,8 @@ async def nc_directions(message: Message, state: FSMContext) -> None:
 async def nc_ages(message: Message, state: FSMContext) -> None:
     try:
         ages = [] if message.text == texts.BTN_SKIP else _parse_items(message.text)
-    except forms.FormError as error:
-        await message.answer(str(error))
+    except ValueError:
+        await message.answer(texts.NC_ERR_LIST_ITEM)
         return
     await state.update_data(age_categories=ages)
     await state.set_state(ContestForm.video)
@@ -196,23 +295,46 @@ async def nc_video(
 ) -> None:
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    await state.update_data(require_video=callback_data.action == "video_yes")
+    await state.update_data(
+        require_video=callback_data.action == "video_yes", to_channel=False, to_users=False
+    )
     await state.set_state(ContestForm.confirm)
     draft = _draft_contest(await state.get_data())
 
-    # Oldindan ko'rish: tanlov hali saqlanmagan, shuning uchun tugma botning o'ziga olib boradi
-    me = await bot.me()
-    await services.send_announcement(bot, callback.from_user.id, draft, kb.apply_link(f"https://t.me/{me.username}"))
+    # Oldindan ko'rish: tanlov hali saqlanmagan, shuning uchun tugmalar botning o'ziga olib boradi
+    link = await services.bot_link(bot)
+    await services.send_announcement(bot, callback.from_user.id, draft, kb.channel_buttons(link, link))
     await callback.message.answer(
-        texts.NC_PREVIEW_HEAD + _settings_text(draft), reply_markup=kb.new_contest_confirm()
+        texts.NC_PREVIEW_HEAD + _settings_text(draft) + texts.NC_PUBLISH_HINT,
+        reply_markup=kb.new_contest_publish(False, False),
+    )
+
+
+@router.callback_query(ContestForm.confirm, kb.NewContestCb.filter(F.action.in_({"channel", "broadcast"})))
+async def nc_toggle(
+    callback: CallbackQuery, callback_data: kb.NewContestCb, state: FSMContext, config: Config
+) -> None:
+    data = await state.get_data()
+    if callback_data.action == "channel":
+        if config.channel_id is None:
+            await callback.answer(texts.NO_CHANNEL, show_alert=True)
+            return
+        data["to_channel"] = not data["to_channel"]
+    else:
+        data["to_users"] = not data["to_users"]
+    await state.update_data(to_channel=data["to_channel"], to_users=data["to_users"])
+    await callback.answer()
+    await callback.message.edit_reply_markup(
+        reply_markup=kb.new_contest_publish(data["to_channel"], data["to_users"])
     )
 
 
 @router.callback_query(ContestForm.confirm, kb.NewContestCb.filter(F.action == "save"))
 async def nc_save(
-    callback: CallbackQuery, state: FSMContext, db: Database, config: Config, bot: Bot
+    callback: CallbackQuery, state: FSMContext, db: Database, config: Config, bot: Bot, lang: str
 ) -> None:
-    draft = _draft_contest(await state.get_data())
+    data = await state.get_data()
+    draft = _draft_contest(data)
     await state.clear()
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
@@ -225,18 +347,30 @@ async def nc_save(
         age_categories=draft.age_categories,
         require_video=draft.require_video,
     )
-    await callback.message.answer(texts.NC_SAVED, reply_markup=kb.main_menu(True))
     contest = await db.get_contest(contest_id)
+
+    report = [texts.NC_SAVED]
+    if data.get("to_channel") and config.channel_id is not None:
+        try:
+            await services.post_to_channel(bot, config, contest)
+            report.append(texts.POSTED)
+        except TelegramAPIError as error:
+            report.append(texts.POST_FAILED.format(error=escape(str(error))))
+    if data.get("to_users"):
+        services.start_broadcast(bot, db, contest, callback.from_user.id)
+        report.append(texts.BROADCAST_STARTED)
+
+    await callback.message.answer("\n".join(report), reply_markup=kb.main_menu(lang, True))
     text, markup = await _card(contest, db, config, bot)
     await callback.message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(ContestForm.confirm, kb.NewContestCb.filter(F.action == "cancel"))
-async def nc_cancel(callback: CallbackQuery, state: FSMContext) -> None:
+async def nc_cancel(callback: CallbackQuery, state: FSMContext, lang: str) -> None:
     await state.clear()
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(texts.CANCELLED, reply_markup=kb.main_menu(True))
+    await callback.message.answer(texts.CANCELLED, reply_markup=kb.main_menu(lang, True))
 
 
 @router.message(StateFilter(ContestForm))
@@ -279,7 +413,7 @@ async def _card(contest: Contest, db: Database, config: Config, bot: Bot):
 async def _get_contest(callback: CallbackQuery, callback_data: kb.ContestCb, db: Database) -> Contest | None:
     contest = await db.get_contest(callback_data.id)
     if contest is None:
-        await callback.answer(texts.STALE_BUTTON, show_alert=True)
+        await callback.answer(t("uz", "stale"), show_alert=True)
     return contest
 
 
@@ -324,7 +458,7 @@ async def contest_deadline_ask(
 
 @router.message(EditContest.deadline, F.text)
 async def contest_deadline_save(
-    message: Message, state: FSMContext, db: Database, config: Config, bot: Bot
+    message: Message, state: FSMContext, db: Database, config: Config, bot: Bot, lang: str
 ) -> None:
     if message.text == texts.BTN_SKIP:
         deadline = None
@@ -332,7 +466,7 @@ async def contest_deadline_save(
         try:
             deadline = forms.parse_date(message.text)
         except forms.FormError as error:
-            await message.answer(str(error))
+            await message.answer(error.text("uz"))
             return
         if deadline < now().date():
             await message.answer(texts.NC_ERR_DEADLINE_PAST)
@@ -340,7 +474,7 @@ async def contest_deadline_save(
     data = await state.get_data()
     await state.clear()
     await db.set_contest_deadline(data["contest_id"], deadline)
-    await message.answer(texts.DEADLINE_SAVED, reply_markup=kb.main_menu(True))
+    await message.answer(texts.DEADLINE_SAVED, reply_markup=kb.main_menu(lang, True))
     contest = await db.get_contest(data["contest_id"])
     text, markup = await _card(contest, db, config, bot)
     await message.answer(text, reply_markup=markup)
@@ -351,8 +485,8 @@ async def contest_preview(callback: CallbackQuery, callback_data: kb.ContestCb, 
     if not (contest := await _get_contest(callback, callback_data, db)):
         return
     await callback.answer()
-    link = await services.deep_link(bot, contest.id)
-    await services.send_announcement(bot, callback.from_user.id, contest, kb.apply_link(link))
+    markup = kb.channel_buttons(await services.deep_link(bot, contest.id), await services.bot_link(bot))
+    await services.send_announcement(bot, callback.from_user.id, contest, markup)
 
 
 @router.callback_query(kb.ContestCb.filter(F.action == "post"))
@@ -364,9 +498,8 @@ async def contest_post(
     if config.channel_id is None:
         await callback.answer(texts.NO_CHANNEL, show_alert=True)
         return
-    link = await services.deep_link(bot, contest.id)
     try:
-        await services.send_announcement(bot, config.channel_id, contest, kb.apply_link(link))
+        await services.post_to_channel(bot, config, contest)
     except TelegramAPIError as error:
         await callback.answer()
         await callback.message.answer(texts.POST_FAILED.format(error=escape(str(error))))
@@ -379,7 +512,7 @@ async def contest_broadcast_ask(callback: CallbackQuery, callback_data: kb.Conte
     if not (contest := await _get_contest(callback, callback_data, db)):
         return
     await callback.answer()
-    users = await db.active_user_ids()
+    users = await db.active_users()
     await callback.message.edit_text(
         texts.BROADCAST_CONFIRM.format(n=len(users)), reply_markup=kb.broadcast_confirm(contest.id)
     )
@@ -442,8 +575,8 @@ async def review_application(
     callback: CallbackQuery, callback_data: kb.ReviewCb, db: Database, bot: Bot
 ) -> None:
     app = await db.get_application(callback_data.app_id)
-    if app is None:
-        await callback.answer(texts.STALE_BUTTON, show_alert=True)
+    if app is None or callback_data.action not in ("accepted", "unpaid", "rejected"):
+        await callback.answer(t("uz", "stale"), show_alert=True)
         return
     if app.status == callback_data.action:
         await callback.answer(texts.ALREADY_STATUS)
@@ -452,27 +585,31 @@ async def review_application(
     await db.set_application_status(app.id, callback_data.action)
     app.status = callback_data.action
     contest = await db.get_contest(app.contest_id)
-    await callback.answer(texts.STATUS[app.status])
+    await callback.answer(t("uz", f"status.{app.status}"))
 
     caption = services.admin_caption(app, contest, reviewer=callback.from_user.full_name)
+    markup = kb.review(app.id, with_payment=app.receipt is not None)
+    message = callback.message
     try:
-        if getattr(callback.message, "document", None) or getattr(callback.message, "photo", None):
+        if getattr(message, "document", None) or getattr(message, "photo", None):
             await bot.edit_message_caption(
-                chat_id=callback.message.chat.id,
-                message_id=callback.message.message_id,
-                caption=caption,
-                reply_markup=kb.review(app.id),
+                chat_id=message.chat.id, message_id=message.message_id, caption=caption, reply_markup=markup
             )
         else:
             await bot.edit_message_text(
-                caption,
-                chat_id=callback.message.chat.id,
-                message_id=callback.message.message_id,
-                reply_markup=kb.review(app.id),
+                caption, chat_id=message.chat.id, message_id=message.message_id, reply_markup=markup
             )
     except TelegramBadRequest:
         pass
 
-    await services.notify_user(
-        bot, app.user_id, texts.USER_STATUS[app.status].format(id=app.id, title=escape(contest.title))
-    )
+    # Ishtirokchiga o'z tilida xabar
+    user_lang = await db.get_lang(app.user_id) or "uz"
+    title = escape(contest.title)
+    if app.status == "unpaid":
+        payment = await db.get_payment()
+        details = forms.payment_details(payment, user_lang) if payment else ""
+        text = t(user_lang, "notify.unpaid", id=app.id, title=title, details=details).strip()
+        await services.notify_user(bot, app.user_id, text, kb.receipt_again(app.id, user_lang))
+    else:
+        text = t(user_lang, f"notify.{app.status}", id=app.id, title=title)
+        await services.notify_user(bot, app.user_id, text)

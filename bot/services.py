@@ -22,15 +22,20 @@ from .config import Config
 from .db import Application, Contest, Database
 from .docgen import file_name
 from .forms import format_phone
+from .locales import t
 
 log = logging.getLogger(__name__)
 
 _background: set[asyncio.Task] = set()
 
 
-async def deep_link(bot: Bot, contest_id: int) -> str:
+async def bot_link(bot: Bot) -> str:
     me = await bot.me()
-    return f"https://t.me/{me.username}?start=apply_{contest_id}"
+    return f"https://t.me/{me.username}"
+
+
+async def deep_link(bot: Bot, contest_id: int) -> str:
+    return f"{await bot_link(bot)}?start=apply_{contest_id}"
 
 
 async def send_announcement(
@@ -43,6 +48,12 @@ async def send_announcement(
     return await bot.send_message(chat_id, contest.announcement, reply_markup=markup)
 
 
+async def post_to_channel(bot: Bot, config: Config, contest: Contest) -> Message:
+    """Kanalga e'lon: ostida «Ariza yuborish» va «Botga o'tish» tugmalari."""
+    markup = kb.channel_buttons(await deep_link(bot, contest.id), await bot_link(bot))
+    return await send_announcement(bot, config.channel_id, contest, markup)
+
+
 def start_broadcast(bot: Bot, db: Database, contest: Contest, report_chat_id: int) -> None:
     task = asyncio.create_task(_broadcast(bot, db, contest, report_chat_id))
     _background.add(task)
@@ -50,9 +61,9 @@ def start_broadcast(bot: Bot, db: Database, contest: Contest, report_chat_id: in
 
 
 async def _broadcast(bot: Bot, db: Database, contest: Contest, report_chat_id: int) -> None:
-    markup = kb.apply_button(contest.id)
     sent = failed = 0
-    for user_id in await db.active_user_ids():
+    for user_id, lang in await db.active_users():
+        markup = kb.apply_button(contest.id, lang or "uz")
         for _attempt in range(3):
             try:
                 await send_announcement(bot, user_id, contest, markup)
@@ -82,10 +93,12 @@ def _cut(value: str | None, limit: int) -> str:
     return escape(value if len(value) <= limit else value[: limit - 1] + "…")
 
 
-def admin_caption(app: Application, contest: Contest, reviewer: str | None = None) -> str:
+def admin_caption(
+    app: Application, contest: Contest, reviewer: str | None = None, resubmitted: bool = False
+) -> str:
     """Admin chatidagi ariza izohi (Telegram cheklovi 1024 belgi)."""
     d = app.data
-    kind = texts.KIND_LABELS[app.kind]
+    kind = t("uz", f"kind.{app.kind}")
     if app.kind == "team":
         kind += f" ({len(d.get('participants') or [])} nafar)"
     lines = [
@@ -100,8 +113,10 @@ def admin_caption(app: Application, contest: Contest, reviewer: str | None = Non
     video = d.get("video")
     if video and video["type"] == "link":
         lines.append(f"🎬 {_cut(video['url'], 200)}")
+    if app.receipt:
+        lines.append(texts.RECEIPT_RESENT if resubmitted else texts.RECEIPT_ATTACHED)
     lines.append(f'👤 <a href="tg://user?id={app.user_id}">Yuboruvchi</a> · {app.created_at[:16]}')
-    status = texts.STATUS[app.status]
+    status = t("uz", f"status.{app.status}")
     if reviewer:
         status += f" — {_cut(reviewer, 60)}"
     lines.append(f"\nHolat: {status}")
@@ -109,20 +124,33 @@ def admin_caption(app: Application, contest: Contest, reviewer: str | None = Non
 
 
 async def notify_new_application(
-    bot: Bot, config: Config, app: Application, contest: Contest, doc_path: Path | None
+    bot: Bot,
+    config: Config,
+    app: Application,
+    contest: Contest,
+    doc_path: Path | None,
+    resubmitted: bool = False,
 ) -> None:
-    caption = admin_caption(app, contest)
+    """Adminlarga: Word ariza, (video) va to'lov cheki — ko'rib chiqish tugmalari bilan.
+
+    Chek bo'lsa, tugmalar chek ostida turadi (admin to'lovni ko'rib qaror qiladi);
+    to'lov o'chirilgan bo'lsa — Word fayl ostida.
+    """
+    caption = admin_caption(app, contest, resubmitted=resubmitted)
+    markup = kb.review(app.id, with_payment=app.receipt is not None)
     for chat_id in config.review_chats:
         try:
+            doc_message = None
             if doc_path is not None:
-                message = await bot.send_document(
+                doc_message = await bot.send_document(
                     chat_id,
                     FSInputFile(doc_path, filename=file_name(app.id, app.display_name)),
-                    caption=caption,
-                    reply_markup=kb.review(app.id),
+                    caption=texts.DOC_CAPTION.format(id=app.id) if app.receipt else caption,
+                    reply_markup=None if app.receipt else markup,
                 )
-            else:
-                message = await bot.send_message(chat_id, caption, reply_markup=kb.review(app.id))
+            elif not app.receipt:
+                await bot.send_message(chat_id, caption, reply_markup=markup)
+            reply = ReplyParameters(message_id=doc_message.message_id) if doc_message else None
 
             video = app.data.get("video")
             if video and video["type"] in ("video", "document"):
@@ -131,14 +159,26 @@ async def notify_new_application(
                     chat_id,
                     video["file_id"],
                     caption=texts.VIDEO_CAPTION.format(id=app.id),
-                    reply_parameters=ReplyParameters(message_id=message.message_id),
+                    reply_parameters=reply,
+                )
+
+            if app.receipt:
+                send = bot.send_photo if app.receipt["type"] == "photo" else bot.send_document
+                await send(
+                    chat_id,
+                    app.receipt["file_id"],
+                    caption=caption,
+                    reply_markup=markup,
+                    reply_parameters=reply,
                 )
         except TelegramAPIError:
             log.exception("Could not notify chat %s about application %s", chat_id, app.id)
 
 
-async def notify_user(bot: Bot, user_id: int, text: str) -> None:
+async def notify_user(
+    bot: Bot, user_id: int, text: str, markup: InlineKeyboardMarkup | None = None
+) -> None:
     try:
-        await bot.send_message(user_id, text)
+        await bot.send_message(user_id, text, reply_markup=markup)
     except (TelegramForbiddenError, TelegramBadRequest):
         pass

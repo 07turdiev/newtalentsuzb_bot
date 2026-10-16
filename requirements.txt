@@ -3,3 +3,4 @@ aiosqlite~=0.22
 openpyxl~=3.1
 python-docx~=1.2
 python-dotenv~=1.2
+truststore~=0.10

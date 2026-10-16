@@ -14,6 +14,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from . import texts
 from .db import Application, Contest
 from .forms import Field
+from .locales import LANGS, t
+
+
+class LangCb(CallbackData, prefix="lg"):
+    code: str
 
 
 class ApplyCb(CallbackData, prefix="ap"):
@@ -36,12 +41,16 @@ class MyDocCb(CallbackData, prefix="md"):
     app_id: int
 
 
+class ReceiptCb(CallbackData, prefix="rc"):
+    app_id: int
+
+
 class AdminCb(CallbackData, prefix="ad"):
-    action: str  # menu | new | list | stats
+    action: str  # menu | new | list | stats | pay | pay_edit | pay_off
 
 
 class NewContestCb(CallbackData, prefix="nc"):
-    action: str  # video_yes | video_no | save | cancel
+    action: str  # video_yes | video_no | channel | broadcast | save | cancel
 
 
 class ContestCb(CallbackData, prefix="ct"):
@@ -50,7 +59,7 @@ class ContestCb(CallbackData, prefix="ct"):
 
 
 class ReviewCb(CallbackData, prefix="rv"):
-    action: str  # accepted | rejected
+    action: str  # accepted | unpaid | rejected
     app_id: int
 
 
@@ -62,48 +71,65 @@ def _btn(text: str) -> KeyboardButton:
     return KeyboardButton(text=text)
 
 
-# --- foydalanuvchi ---
+# --- ishtirokchi ---
 
 
-def main_menu(is_admin: bool) -> ReplyKeyboardMarkup:
-    rows = [[_btn(texts.BTN_APPLY)], [_btn(texts.BTN_CONTESTS), _btn(texts.BTN_MY_APPS)]]
+def languages() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for code, name in LANGS.items():
+        builder.button(text=name, callback_data=LangCb(code=code))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def main_menu(lang: str, is_admin: bool) -> ReplyKeyboardMarkup:
+    rows = [
+        [_btn(t(lang, "btn.apply"))],
+        [_btn(t(lang, "btn.contests")), _btn(t(lang, "btn.my_apps"))],
+        [_btn(t(lang, "btn.lang"))],
+    ]
     if is_admin:
         rows.append([_btn(texts.BTN_ADMIN)])
     return _reply(rows)
 
 
-def cancel_only() -> ReplyKeyboardMarkup:
-    return _reply([[_btn(texts.BTN_CANCEL)]])
+def cancel_only(lang: str = "uz") -> ReplyKeyboardMarkup:
+    return _reply([[_btn(t(lang, "btn.cancel"))]])
 
 
 def skip_cancel() -> ReplyKeyboardMarkup:
     return _reply([[_btn(texts.BTN_SKIP)], [_btn(texts.BTN_CANCEL)]])
 
 
-def field_keyboard(field: Field, options: Sequence[str], can_back: bool) -> ReplyKeyboardMarkup:
+def field_keyboard(field: Field, options: Sequence[str], can_back: bool, lang: str) -> ReplyKeyboardMarkup:
     rows: list[list[KeyboardButton]] = []
     if field.type == "choice" and options:
         per_row = 2 if all(len(o) <= 18 for o in options) else 1
         for i in range(0, len(options), per_row):
             rows.append([_btn(o) for o in options[i : i + per_row]])
     if field.type == "phone":
-        rows.append([KeyboardButton(text=texts.BTN_PHONE, request_contact=True)])
+        rows.append([KeyboardButton(text=t(lang, "btn.phone"), request_contact=True)])
     if field.optional:
-        rows.append([_btn(texts.BTN_SKIP)])
-    rows.append([_btn(texts.BTN_BACK), _btn(texts.BTN_CANCEL)] if can_back else [_btn(texts.BTN_CANCEL)])
+        rows.append([_btn(t(lang, "btn.skip"))])
+    cancel = _btn(t(lang, "btn.cancel"))
+    rows.append([_btn(t(lang, "btn.back")), cancel] if can_back else [cancel])
     return _reply(rows)
 
 
-def apply_button(contest_id: int) -> InlineKeyboardMarkup:
+def apply_button(contest_id: int, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(
-            text=texts.BTN_APPLY, callback_data=ApplyCb(contest_id=contest_id).pack()
+            text=t(lang, "btn.apply"), callback_data=ApplyCb(contest_id=contest_id).pack()
         )]]
     )
 
 
-def apply_link(url: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=texts.BTN_APPLY, url=url)]])
+def channel_buttons(apply_url: str, bot_url: str) -> InlineKeyboardMarkup:
+    """Kanal posti ostidagi tugmalar: ariza yuborish va botga havola."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t("uz", "btn.apply"), url=apply_url)],
+        [InlineKeyboardButton(text=texts.BTN_OPEN_BOT, url=bot_url)],
+    ])
 
 
 def contests_choice(contests: Sequence[Contest]) -> InlineKeyboardMarkup:
@@ -114,39 +140,57 @@ def contests_choice(contests: Sequence[Contest]) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def kind_choice() -> InlineKeyboardMarkup:
+def kind_choice(lang: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for kind, label in texts.KIND_LABELS.items():
-        builder.button(text=label, callback_data=KindCb(kind=kind))
+    for kind in ("solo", "team"):
+        builder.button(text=t(lang, f"kind.{kind}"), callback_data=KindCb(kind=kind))
     builder.adjust(1)
     return builder.as_markup()
 
 
-def confirm() -> InlineKeyboardMarkup:
+def confirm(lang: str, with_payment: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=texts.BTN_CONFIRM, callback_data=ConfirmCb(action="send"))
-    builder.button(text=texts.BTN_EDIT, callback_data=ConfirmCb(action="edit"))
-    builder.button(text=texts.BTN_CANCEL, callback_data=ConfirmCb(action="cancel"))
+    builder.button(
+        text=t(lang, "btn.confirm_pay" if with_payment else "btn.confirm"),
+        callback_data=ConfirmCb(action="send"),
+    )
+    builder.button(text=t(lang, "btn.edit"), callback_data=ConfirmCb(action="edit"))
+    builder.button(text=t(lang, "btn.cancel"), callback_data=ConfirmCb(action="cancel"))
     builder.adjust(1, 2)
     return builder.as_markup()
 
 
-def edit_fields(fields: Sequence[Field]) -> InlineKeyboardMarkup:
+def edit_fields(fields: Sequence[Field], lang: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for index, field in enumerate(fields):
-        builder.button(text=field.label, callback_data=EditCb(index=index))
+        builder.button(text=field.label(lang), callback_data=EditCb(index=index))
     builder.adjust(2)
-    builder.row(InlineKeyboardButton(text=texts.BTN_BACK, callback_data=ConfirmCb(action="back").pack()))
+    builder.row(InlineKeyboardButton(text=t(lang, "btn.back"), callback_data=ConfirmCb(action="back").pack()))
     return builder.as_markup()
 
 
-def my_docs(apps: Sequence[Application]) -> InlineKeyboardMarkup:
+def my_apps(apps: Sequence[Application], lang: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for app in apps:
-        if app.doc_path:
-            builder.button(text=f"📄 №{app.id}", callback_data=MyDocCb(app_id=app.id))
-    builder.adjust(4)
+        if app.status in ("awaiting_payment", "unpaid"):
+            builder.row(InlineKeyboardButton(
+                text=t(lang, "btn.receipt", id=app.id),
+                callback_data=ReceiptCb(app_id=app.id).pack(),
+            ))
+    docs = [
+        InlineKeyboardButton(text=f"📄 №{app.id}", callback_data=MyDocCb(app_id=app.id).pack())
+        for app in apps
+        if app.doc_path
+    ]
+    for i in range(0, len(docs), 4):
+        builder.row(*docs[i : i + 4])
     return builder.as_markup()
+
+
+def receipt_again(app_id: int, lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+        text=t(lang, "btn.receipt_again"), callback_data=ReceiptCb(app_id=app_id).pack()
+    )]])
 
 
 # --- admin ---
@@ -156,6 +200,7 @@ def admin_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=texts.BTN_NEW_CONTEST, callback_data=AdminCb(action="new"))
     builder.button(text=texts.BTN_CONTEST_LIST, callback_data=AdminCb(action="list"))
+    builder.button(text=texts.BTN_PAYMENT, callback_data=AdminCb(action="pay"))
     builder.button(text=texts.BTN_STATS, callback_data=AdminCb(action="stats"))
     builder.adjust(1)
     return builder.as_markup()
@@ -167,6 +212,16 @@ def back_to_admin() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def payment_settings(enabled: bool) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=texts.BTN_PAYMENT_EDIT, callback_data=AdminCb(action="pay_edit"))
+    if enabled:
+        builder.button(text=texts.BTN_PAYMENT_OFF, callback_data=AdminCb(action="pay_off"))
+    builder.button(text=texts.BTN_TO_MENU, callback_data=AdminCb(action="menu"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def video_choice() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=texts.NC_VIDEO_YES, callback_data=NewContestCb(action="video_yes"))
@@ -175,9 +230,21 @@ def video_choice() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def new_contest_confirm() -> InlineKeyboardMarkup:
+def new_contest_publish(to_channel: bool, to_users: bool) -> InlineKeyboardMarkup:
+    """E'lon qayerga yuborilishini belgilash (checkbox ko'rinishida) va saqlash."""
     builder = InlineKeyboardBuilder()
-    builder.button(text=texts.NC_SAVE, callback_data=NewContestCb(action="save"))
+    builder.button(
+        text=("☑️ " if to_channel else "⬜️ ") + texts.NC_TOGGLE_CHANNEL,
+        callback_data=NewContestCb(action="channel"),
+    )
+    builder.button(
+        text=("☑️ " if to_users else "⬜️ ") + texts.NC_TOGGLE_BROADCAST,
+        callback_data=NewContestCb(action="broadcast"),
+    )
+    builder.button(
+        text=texts.NC_SAVE_PUBLISH if to_channel or to_users else texts.NC_SAVE_ONLY,
+        callback_data=NewContestCb(action="save"),
+    )
     builder.button(text=texts.BTN_CANCEL, callback_data=NewContestCb(action="cancel"))
     builder.adjust(1)
     return builder.as_markup()
@@ -220,9 +287,11 @@ def broadcast_confirm(contest_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def review(app_id: int) -> InlineKeyboardMarkup:
+def review(app_id: int, with_payment: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=texts.BTN_ACCEPT, callback_data=ReviewCb(action="accepted", app_id=app_id))
+    if with_payment:
+        builder.button(text=texts.BTN_UNPAID, callback_data=ReviewCb(action="unpaid", app_id=app_id))
     builder.button(text=texts.BTN_REJECT, callback_data=ReviewCb(action="rejected", app_id=app_id))
-    builder.adjust(2)
+    builder.adjust(1)
     return builder.as_markup()
