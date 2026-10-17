@@ -14,7 +14,6 @@ CHOOSE_LANG = "🌐 Tilni tanlang\n🌐 Выберите язык\n🌐 Choose y
 UZ = {
     # --- tugmalar ---
     "btn.apply": "📝 Ariza yuborish",
-    "btn.contests": "🏆 Tanlovlar",
     "btn.my_apps": "📋 Mening arizalarim",
     "btn.lang": "🌐 Til",
     "btn.cancel": "❌ Bekor qilish",
@@ -186,7 +185,6 @@ UZ = {
 RU = {
     # --- кнопки ---
     "btn.apply": "📝 Подать заявку",
-    "btn.contests": "🏆 Конкурсы",
     "btn.my_apps": "📋 Мои заявки",
     "btn.lang": "🌐 Язык",
     "btn.cancel": "❌ Отмена",
@@ -353,7 +351,6 @@ RU = {
 EN = {
     # --- buttons ---
     "btn.apply": "📝 Apply",
-    "btn.contests": "🏆 Competitions",
     "btn.my_apps": "📋 My applications",
     "btn.lang": "🌐 Language",
     "btn.cancel": "❌ Cancel",

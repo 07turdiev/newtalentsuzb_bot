@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from html import escape
 
-from aiogram import Bot, F, Router
+from aiogram import F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -14,7 +14,6 @@ from ..config import Config
 from ..db import Database
 from ..docgen import file_name
 from ..locales import CHOOSE_LANG, LANGS, t, variants
-from ..services import send_announcement
 from .apply import ReceiptForm, start_application
 
 router = Router(name="user")
@@ -92,16 +91,6 @@ async def cancel(message: Message, state: FSMContext, config: Config, lang: str)
     else:
         text = t(lang, "cancelled")
     await message.answer(text, reply_markup=kb.main_menu(lang, message.from_user.id in config.admin_ids))
-
-
-@router.message(StateFilter(None), F.text.in_(variants("btn.contests")))
-async def show_contests(message: Message, db: Database, bot: Bot, lang: str) -> None:
-    contests = await db.accepting_contests()
-    if not contests:
-        await message.answer(t(lang, "no_contests"))
-        return
-    for contest in contests:
-        await send_announcement(bot, message.chat.id, contest, kb.apply_button(contest.id, lang))
 
 
 @router.message(StateFilter(None), F.text.in_(variants("btn.my_apps")))

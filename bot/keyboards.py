@@ -85,8 +85,7 @@ def languages() -> InlineKeyboardMarkup:
 def main_menu(lang: str, is_admin: bool) -> ReplyKeyboardMarkup:
     rows = [
         [_btn(t(lang, "btn.apply"))],
-        [_btn(t(lang, "btn.contests")), _btn(t(lang, "btn.my_apps"))],
-        [_btn(t(lang, "btn.lang"))],
+        [_btn(t(lang, "btn.my_apps")), _btn(t(lang, "btn.lang"))],
     ]
     if is_admin:
         rows.append([_btn(texts.BTN_ADMIN)])
