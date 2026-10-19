@@ -123,9 +123,17 @@ def admin_caption(
     return "\n".join(lines)
 
 
+def review_chats(config: Config, db: Database) -> list[int]:
+    """Yangi arizalar yuboriladigan chatlar: admin guruhi yoki har bir admin."""
+    if config.admin_chat_id:
+        return [config.admin_chat_id]
+    return sorted(config.admin_ids | db.admin_ids)
+
+
 async def notify_new_application(
     bot: Bot,
     config: Config,
+    db: Database,
     app: Application,
     contest: Contest,
     doc_path: Path | None,
@@ -138,7 +146,7 @@ async def notify_new_application(
     """
     caption = admin_caption(app, contest, resubmitted=resubmitted)
     markup = kb.review(app.id, with_payment=app.receipt is not None)
-    for chat_id in config.review_chats:
+    for chat_id in review_chats(config, db):
         try:
             doc_message = None
             if doc_path is not None:

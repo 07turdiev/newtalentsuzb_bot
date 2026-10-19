@@ -17,7 +17,7 @@ Telegram bot tanlovni e'lon qiladi va ishtirokchilardan ariza hamda to'lov cheki
 
 1. **Bot yaratish.** Telegramda [@BotFather](https://t.me/BotFather) → `/newbot` → token oling.
 2. **Admin ID.** [@userinfobot](https://t.me/userinfobot) ga yozing, u sizning ID ingizni beradi.
-   Bir nechta admin bo'lsa, har birining ID sini oling.
+   Bu **asosiy adminlar** bo'ladi; boshqa adminlarni keyin botning o'zidan qo'shasiz.
 3. **Admin guruhi** (tavsiya etiladi). Tashkilotchilar uchun yopiq guruh yarating va botni qo'shing.
    Bot ishga tushgach, guruhda `/id` deb yozing — guruh ID si (`-100…`) chiqadi.
 4. **Kanal** (ixtiyoriy). Botni kanalga **admin** qilib qo'shing («Xabar joylash» huquqi bilan).
@@ -111,7 +111,13 @@ to'xtating (`systemctl stop newtalents-bot`), aks holda `Conflict` xatosi chiqad
    - **⏳ Muddatni o'zgartirish**, **🔒 Qabulni yopish / 🔓 qayta ochish**.
 4. Ishtirokchi chek yuborgach, admin guruhiga Word ariza va uning ostida chek keladi (video bo'lsa,
    u ham). Chek ostidagi tugmalar: **✅ Qabul qilish**, **💳 To'lov qilinmagan**, **❌ Rad etish** —
-   ishtirokchiga o'z tilida xabar boradi. Tugmalarni faqat `ADMIN_IDS` dagi adminlar bosa oladi.
+   ishtirokchiga o'z tilida xabar boradi. Tugmalarni faqat adminlar bosa oladi.
+5. **👥 Adminlar** (faqat asosiy adminlarda, ya'ni `.env` dagi `ADMIN_IDS`): **➕ Admin qo'shish**
+   → «👤 Foydalanuvchini tanlash» bilan kontaktlardan tanlang yoki Telegram ID sini yozing.
+   Yangi admin darhol kuchga kiradi (botni qayta ishga tushirish shart emas) va unga xabar boradi;
+   🗑 tugmasi bilan olib tashlanadi. Qo'shilgan adminlar tanlov va arizalarni boshqaradi, lekin
+   adminlar ro'yxatini o'zgartira olmaydi. `ADMIN_CHAT_ID` bo'sh bo'lsa, yangi arizalar barcha
+   adminlarga keladi.
 
 ## 4. Moslashtirish
 

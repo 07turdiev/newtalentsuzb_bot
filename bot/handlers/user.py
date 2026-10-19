@@ -13,6 +13,7 @@ from .. import keyboards as kb
 from ..config import Config
 from ..db import Database
 from ..docgen import file_name
+from ..filters import is_admin
 from ..locales import CHOOSE_LANG, LANGS, t, variants
 from .apply import ReceiptForm, start_application
 
@@ -31,7 +32,7 @@ async def send_welcome(message: Message, user: User, db: Database, config: Confi
     titles = ", ".join(f"<b>«{escape(c.title)}»</b>" for c in contests)
     await message.answer(
         t(lang, key, name=escape(user.first_name), contests=titles, btn=t(lang, "btn.apply")),
-        reply_markup=kb.main_menu(lang, user.id in config.admin_ids),
+        reply_markup=kb.main_menu(lang, is_admin(user.id, config, db)),
     )
 
 
@@ -83,14 +84,14 @@ async def language_chosen(
 
 @router.message(Command("cancel"))
 @router.message(F.text.in_(variants("btn.cancel")))
-async def cancel(message: Message, state: FSMContext, config: Config, lang: str) -> None:
+async def cancel(message: Message, state: FSMContext, db: Database, config: Config, lang: str) -> None:
     waiting_receipt = await state.get_state() == ReceiptForm.wait.state
     await state.clear()
     if waiting_receipt:
         text = t(lang, "receipt.later", my_apps=t(lang, "btn.my_apps"))
     else:
         text = t(lang, "cancelled")
-    await message.answer(text, reply_markup=kb.main_menu(lang, message.from_user.id in config.admin_ids))
+    await message.answer(text, reply_markup=kb.main_menu(lang, is_admin(message.from_user.id, config, db)))
 
 
 @router.message(StateFilter(None), F.text.in_(variants("btn.my_apps")))

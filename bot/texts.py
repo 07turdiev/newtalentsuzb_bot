@@ -20,6 +20,41 @@ NO_CONTESTS_ADMIN = "Hali tanlov yaratilmagan."
 CONTESTS_HEAD = "🏆 <b>Tanlovlar</b>\n🟢 — ariza qabul qilinmoqda, 🔴 — yopiq"
 CANCELLED = "Bekor qilindi."
 
+# --- Adminlar ---
+BTN_ADMINS = "👥 Adminlar"
+BTN_ADMIN_ADD = "➕ Admin qo'shish"
+BTN_PICK_USER = "👤 Foydalanuvchini tanlash"
+BTN_YES_REMOVE = "✅ Ha, olib tashlansin"
+ADMINS_HEAD = "👥 <b>Adminlar</b>"
+ADMINS_MAIN = "<b>Asosiy adminlar</b> (.env faylida, botdan o'chirilmaydi):"
+ADMINS_ADDED = "<b>Botdan qo'shilgan adminlar:</b>"
+ADMINS_NONE = "hali yo'q"
+ADMINS_HINT = (
+    "<i>Adminlar tanlovlarni boshqaradi va arizalarni ko'rib chiqadi. "
+    "Adminlarni faqat asosiy adminlar qo'sha va olib tashlay oladi.</i>"
+)
+ADMIN_ADD_PROMPT = (
+    "➕ <b>Yangi admin</b>\n\n"
+    f"«{BTN_PICK_USER}» tugmasini bosib, kontaktlaringizdan tanlang "
+    "yoki uning Telegram ID raqamini yozing.\n"
+    "<i>ID ni bilish uchun u botga /id deb yozsin.</i>"
+)
+ADMIN_ADD_EXPECTED = (
+    f"Foydalanuvchini «{BTN_PICK_USER}» tugmasi orqali tanlang yoki ID raqamini yozing (faqat raqamlar)."
+)
+ADMIN_ALREADY = "Bu foydalanuvchi allaqachon admin."
+ADMIN_ADDED = "✅ {name} admin etib qo'shildi."
+ADMIN_NOT_STARTED = (
+    "\n\n⚠️ U hali botga /start bosmagan. Bosgach, unda «⚙️ Admin panel» tugmasi paydo bo'ladi."
+)
+ADMIN_REMOVE_CONFIRM = "{name} adminlikdan olib tashlansinmi?"
+ADMIN_REMOVED = "Admin olib tashlandi."
+YOU_ARE_ADMIN = (
+    "✅ Siz botda admin etib tayinlandingiz.\n"
+    "Pastdagi «⚙️ Admin panel» tugmasi orqali tanlovlar va arizalarni boshqarasiz."
+)
+YOU_ARE_NOT_ADMIN = "Botdagi admin huquqingiz olib tashlandi."
+
 # --- Yangi tanlov ---
 NC_TITLE = (
     "<b>1/6. Tanlov nomi</b>\n\n"

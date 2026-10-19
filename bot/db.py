@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS applications (
     created_at  TEXT NOT NULL
 );
 
+-- Botdan qo'shilgan adminlar (.env dagi ADMIN_IDS dan tashqari)
+CREATE TABLE IF NOT EXISTS admins (
+    id          INTEGER PRIMARY KEY,    -- Telegram ID
+    name        TEXT,
+    added_by    INTEGER,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
@@ -141,6 +149,7 @@ class Database:
         self.path = path
         self._conn: aiosqlite.Connection | None = None
         self._langs: dict[int, str | None] = {}
+        self.admin_ids: frozenset[int] = frozenset()  # botdan qo'shilgan adminlar
 
     @property
     def conn(self) -> aiosqlite.Connection:
@@ -160,6 +169,7 @@ class Database:
             if column not in columns:
                 await self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
         await self._conn.commit()
+        await self._load_admins()
 
     async def close(self) -> None:
         if self._conn is not None:
@@ -352,6 +362,37 @@ class Database:
             (contest_id,),
         )
         return [Application.from_row(row) for row in rows]
+
+    # --- botdan qo'shilgan adminlar ---
+
+    async def _load_admins(self) -> None:
+        rows = await self._fetchall("SELECT id FROM admins")
+        self.admin_ids = frozenset(row["id"] for row in rows)
+
+    async def list_admins(self) -> list[tuple[int, str | None]]:
+        """(id, ism) ro'yxati: foydalanuvchining botdagi joriy ismi yoki qo'shilgandagi ismi."""
+        rows = await self._fetchall(
+            "SELECT a.id, COALESCE(u.full_name, a.name) AS name "
+            "FROM admins a LEFT JOIN users u ON u.id = a.id ORDER BY a.created_at"
+        )
+        return [(row["id"], row["name"]) for row in rows]
+
+    async def add_admin(self, user_id: int, name: str | None, added_by: int) -> None:
+        await self.conn.execute(
+            "INSERT OR REPLACE INTO admins (id, name, added_by, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, name, added_by, _timestamp()),
+        )
+        await self.conn.commit()
+        await self._load_admins()
+
+    async def remove_admin(self, user_id: int) -> None:
+        await self.conn.execute("DELETE FROM admins WHERE id = ?", (user_id,))
+        await self.conn.commit()
+        await self._load_admins()
+
+    async def user_name(self, user_id: int) -> str | None:
+        row = await self._fetchone("SELECT full_name FROM users WHERE id = ?", (user_id,))
+        return row["full_name"] if row else None
 
     async def total_applications(self) -> int:
         row = await self._fetchone("SELECT COUNT(*) AS n FROM applications")

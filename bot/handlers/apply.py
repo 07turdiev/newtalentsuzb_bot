@@ -17,6 +17,7 @@ from .. import docgen, forms, services
 from .. import keyboards as kb
 from ..config import Config, now
 from ..db import Contest, Database
+from ..filters import is_admin
 from ..locales import t, variants
 
 log = logging.getLogger(__name__)
@@ -37,8 +38,8 @@ class ReceiptForm(StatesGroup):
     wait = State()
 
 
-def _menu(user_id: int, config: Config, lang: str):
-    return kb.main_menu(lang, user_id in config.admin_ids)
+def _menu(user_id: int, config: Config, db: Database, lang: str):
+    return kb.main_menu(lang, is_admin(user_id, config, db))
 
 
 async def start_application(
@@ -64,15 +65,15 @@ async def _load(state: FSMContext, db: Database) -> tuple[dict, Contest | None]:
     return data, contest
 
 
-async def _abort(message: Message, state: FSMContext, config: Config, lang: str) -> None:
+async def _abort(message: Message, state: FSMContext, db: Database, config: Config, lang: str) -> None:
     await state.clear()
-    await message.answer(t(lang, "contest_closed"), reply_markup=_menu(message.chat.id, config, lang))
+    await message.answer(t(lang, "contest_closed"), reply_markup=_menu(message.chat.id, config, db, lang))
 
 
 async def ask_field(message: Message, state: FSMContext, db: Database, config: Config, lang: str) -> None:
     data, contest = await _load(state, db)
     if contest is None:
-        await _abort(message, state, config, lang)
+        await _abort(message, state, db, config, lang)
         return
     fields = forms.fields_for(data["kind"], contest)
     step = data["step"]
@@ -90,7 +91,7 @@ async def ask_field(message: Message, state: FSMContext, db: Database, config: C
 async def show_confirm(message: Message, state: FSMContext, db: Database, config: Config, lang: str) -> None:
     data, contest = await _load(state, db)
     if contest is None:
-        await _abort(message, state, config, lang)
+        await _abort(message, state, db, config, lang)
         return
     await state.set_state(ApplyForm.confirm)
     await message.answer(
@@ -152,7 +153,7 @@ async def kind_expected(message: Message, lang: str) -> None:
 async def field_answer(message: Message, state: FSMContext, db: Database, config: Config, lang: str) -> None:
     data, contest = await _load(state, db)
     if contest is None:
-        await _abort(message, state, config, lang)
+        await _abort(message, state, db, config, lang)
         return
     fields = forms.fields_for(data["kind"], contest)
     step = min(data["step"], len(fields) - 1)
@@ -219,11 +220,13 @@ async def edit_field(
 
 
 @router.callback_query(ApplyForm.confirm, kb.ConfirmCb.filter(F.action == "cancel"))
-async def confirm_cancel(callback: CallbackQuery, state: FSMContext, config: Config, lang: str) -> None:
+async def confirm_cancel(
+    callback: CallbackQuery, state: FSMContext, db: Database, config: Config, lang: str
+) -> None:
     await state.clear()
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(t(lang, "cancelled"), reply_markup=_menu(callback.from_user.id, config, lang))
+    await callback.message.answer(t(lang, "cancelled"), reply_markup=_menu(callback.from_user.id, config, db, lang))
 
 
 @router.callback_query(ApplyForm.confirm, kb.ConfirmCb.filter(F.action == "send"))
@@ -234,7 +237,7 @@ async def submit(
     await state.clear()  # ikki marta bosilsa, ikkinchisi e'tiborsiz qoladi
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    menu = _menu(callback.from_user.id, config, lang)
+    menu = _menu(callback.from_user.id, config, db, lang)
 
     if contest is None or not contest.accepting:
         await callback.message.answer(t(lang, "contest_closed"), reply_markup=menu)
@@ -277,7 +280,7 @@ async def submit(
         )
     else:
         await callback.message.answer(text, reply_markup=menu)
-    await services.notify_new_application(bot, config, app, contest, doc_path)
+    await services.notify_new_application(bot, config, db, app, contest, doc_path)
 
 
 @router.message(ApplyForm.confirm)
@@ -317,7 +320,7 @@ async def receipt_received(
 ) -> None:
     app_id = (await state.get_data()).get("app_id")
     await state.clear()
-    menu = _menu(message.from_user.id, config, lang)
+    menu = _menu(message.from_user.id, config, db, lang)
     app = await db.get_application(app_id) if app_id else None
     if app is None or app.user_id != message.from_user.id or app.status not in RECEIPT_STATUSES:
         await message.answer(t(lang, "receipt.not_needed"), reply_markup=menu)
@@ -340,7 +343,7 @@ async def receipt_received(
         await message.answer_document(FSInputFile(doc_path, filename=doc_path.name), caption=text, reply_markup=menu)
     else:
         await message.answer(text, reply_markup=menu)
-    await services.notify_new_application(bot, config, app, contest, doc_path, resubmitted=resubmitted)
+    await services.notify_new_application(bot, config, db, app, contest, doc_path, resubmitted=resubmitted)
 
 
 @router.message(ReceiptForm.wait)

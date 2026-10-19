@@ -22,7 +22,7 @@ def now() -> datetime:
 @dataclass(frozen=True)
 class Config:
     bot_token: str
-    admin_ids: frozenset[int]
+    admin_ids: frozenset[int]  # asosiy adminlar (.env); botdan qo'shilganlari — Database.admin_ids
     admin_chat_id: int | None
     channel_id: int | str | None
     data_dir: Path
@@ -30,13 +30,6 @@ class Config:
     @property
     def db_path(self) -> Path:
         return self.data_dir / "bot.db"
-
-    @property
-    def review_chats(self) -> list[int]:
-        """Yangi arizalar yuboriladigan chatlar: admin guruhi yoki har bir admin."""
-        if self.admin_chat_id:
-            return [self.admin_chat_id]
-        return sorted(self.admin_ids)
 
 
 def _int_or_none(value: str, name: str) -> int | None:

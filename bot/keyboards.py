@@ -7,6 +7,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    KeyboardButtonRequestUsers,
     ReplyKeyboardMarkup,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -47,6 +48,11 @@ class ReceiptCb(CallbackData, prefix="rc"):
 
 class AdminCb(CallbackData, prefix="ad"):
     action: str  # menu | new | list | stats | pay | pay_edit | pay_off
+
+
+class AdminsCb(CallbackData, prefix="am"):
+    action: str  # list | add | del | del_ok
+    id: int = 0
 
 
 class NewContestCb(CallbackData, prefix="nc"):
@@ -195,14 +201,45 @@ def receipt_again(app_id: int, lang: str) -> InlineKeyboardMarkup:
 # --- admin ---
 
 
-def admin_menu() -> InlineKeyboardMarkup:
+def admin_menu(is_owner: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=texts.BTN_NEW_CONTEST, callback_data=AdminCb(action="new"))
     builder.button(text=texts.BTN_CONTEST_LIST, callback_data=AdminCb(action="list"))
     builder.button(text=texts.BTN_PAYMENT, callback_data=AdminCb(action="pay"))
+    if is_owner:
+        builder.button(text=texts.BTN_ADMINS, callback_data=AdminsCb(action="list"))
     builder.button(text=texts.BTN_STATS, callback_data=AdminCb(action="stats"))
     builder.adjust(1)
     return builder.as_markup()
+
+
+def admins_list(admins: Sequence[tuple[int, str | None]]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=texts.BTN_ADMIN_ADD, callback_data=AdminsCb(action="add"))
+    for user_id, name in admins:
+        builder.button(text=f"🗑 {name or user_id}", callback_data=AdminsCb(action="del", id=user_id))
+    builder.button(text=texts.BTN_TO_MENU, callback_data=AdminCb(action="menu"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_remove_confirm(user_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=texts.BTN_YES_REMOVE, callback_data=AdminsCb(action="del_ok", id=user_id))
+    builder.button(text=texts.BTN_NO, callback_data=AdminsCb(action="list"))
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def pick_user() -> ReplyKeyboardMarkup:
+    """Telegram kontaktlaridan foydalanuvchi tanlash tugmasi (ID bilish shart emas)."""
+    request = KeyboardButtonRequestUsers(
+        request_id=1, user_is_bot=False, max_quantity=1, request_name=True, request_username=True
+    )
+    return _reply([
+        [KeyboardButton(text=texts.BTN_PICK_USER, request_users=request)],
+        [_btn(texts.BTN_CANCEL)],
+    ])
 
 
 def back_to_admin() -> InlineKeyboardMarkup:

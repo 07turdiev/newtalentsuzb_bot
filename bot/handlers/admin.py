@@ -19,7 +19,7 @@ from .. import keyboards as kb
 from .. import texts
 from ..config import Config, now
 from ..db import Contest, Database
-from ..filters import IsAdmin
+from ..filters import IsAdmin, IsOwner, is_admin
 from ..locales import t
 
 router = Router(name="admin")
@@ -49,20 +49,141 @@ class PaymentForm(StatesGroup):
     amount = State()
 
 
+class AdminForm(StatesGroup):
+    add = State()
+
+
 # --- panel ---
 
 
 @router.message(Command("admin"))
 @router.message(StateFilter(None), F.text == texts.BTN_ADMIN)
-async def admin_panel(message: Message, state: FSMContext) -> None:
+async def admin_panel(message: Message, state: FSMContext, config: Config) -> None:
     await state.clear()
-    await message.answer(texts.ADMIN_PANEL, reply_markup=kb.admin_menu())
+    await message.answer(
+        texts.ADMIN_PANEL, reply_markup=kb.admin_menu(message.from_user.id in config.admin_ids)
+    )
 
 
 @router.callback_query(kb.AdminCb.filter(F.action == "menu"))
-async def admin_menu(callback: CallbackQuery) -> None:
+async def admin_menu(callback: CallbackQuery, config: Config) -> None:
     await callback.answer()
-    await callback.message.edit_text(texts.ADMIN_PANEL, reply_markup=kb.admin_menu())
+    await callback.message.edit_text(
+        texts.ADMIN_PANEL, reply_markup=kb.admin_menu(callback.from_user.id in config.admin_ids)
+    )
+
+
+# --- adminlar (faqat asosiy adminlar boshqaradi) ---
+
+
+def _admin_line(user_id: int, name: str | None) -> str:
+    return f"• {escape(name)} — <code>{user_id}</code>" if name else f"• <code>{user_id}</code>"
+
+
+async def _admins_view(db: Database, config: Config):
+    lines = [texts.ADMINS_HEAD, "", texts.ADMINS_MAIN]
+    for user_id in sorted(config.admin_ids):
+        lines.append(_admin_line(user_id, await db.user_name(user_id)))
+    added = await db.list_admins()
+    lines += ["", texts.ADMINS_ADDED]
+    lines += [_admin_line(user_id, name) for user_id, name in added] or [texts.ADMINS_NONE]
+    lines += ["", texts.ADMINS_HINT]
+    return "\n".join(lines), kb.admins_list(added)
+
+
+@router.callback_query(kb.AdminsCb.filter(F.action == "list"), IsOwner())
+async def admins_list(callback: CallbackQuery, db: Database, config: Config) -> None:
+    await callback.answer()
+    text, markup = await _admins_view(db, config)
+    await callback.message.edit_text(text, reply_markup=markup)
+
+
+@router.callback_query(kb.AdminsCb.filter(F.action == "add"), IsOwner())
+async def admin_add_start(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await state.clear()
+    await state.set_state(AdminForm.add)
+    await callback.message.answer(texts.ADMIN_ADD_PROMPT, reply_markup=kb.pick_user())
+
+
+async def _add_admin(
+    message: Message, state: FSMContext, db: Database, config: Config, bot: Bot, lang: str,
+    user_id: int, name: str | None,
+) -> None:
+    await state.clear()
+    menu = kb.main_menu(lang, True)
+    if is_admin(user_id, config, db):
+        await message.answer(texts.ADMIN_ALREADY, reply_markup=menu)
+    else:
+        await db.add_admin(user_id, name, message.from_user.id)
+        text = texts.ADMIN_ADDED.format(name=escape(name or str(user_id)))
+        # Yangi adminga xabar va admin tugmasi bor menyu; botni hali ochmagan bo'lsa, yetib bormaydi
+        user_lang = await db.get_lang(user_id) or "uz"
+        try:
+            await bot.send_message(user_id, texts.YOU_ARE_ADMIN, reply_markup=kb.main_menu(user_lang, True))
+        except TelegramAPIError:
+            text += texts.ADMIN_NOT_STARTED
+        await message.answer(text, reply_markup=menu)
+    view, markup = await _admins_view(db, config)
+    await message.answer(view, reply_markup=markup)
+
+
+@router.message(AdminForm.add, F.users_shared, IsOwner())
+async def admin_add_shared(
+    message: Message, state: FSMContext, db: Database, config: Config, bot: Bot, lang: str
+) -> None:
+    shared = message.users_shared.users[0]
+    name = " ".join(filter(None, (shared.first_name, shared.last_name)))
+    if not name and shared.username:
+        name = "@" + shared.username
+    await _add_admin(message, state, db, config, bot, lang, shared.user_id, name or None)
+
+
+@router.message(AdminForm.add, F.text.regexp(r"^\s*\d{5,15}\s*$"), IsOwner())
+async def admin_add_by_id(
+    message: Message, state: FSMContext, db: Database, config: Config, bot: Bot, lang: str
+) -> None:
+    user_id = int(message.text)
+    await _add_admin(message, state, db, config, bot, lang, user_id, await db.user_name(user_id))
+
+
+@router.message(AdminForm.add)
+async def admin_add_unexpected(message: Message) -> None:
+    await message.answer(texts.ADMIN_ADD_EXPECTED)
+
+
+@router.callback_query(kb.AdminsCb.filter(F.action == "del"), IsOwner())
+async def admin_remove_ask(callback: CallbackQuery, callback_data: kb.AdminsCb, db: Database) -> None:
+    name = dict(await db.list_admins()).get(callback_data.id)
+    if callback_data.id not in db.admin_ids:
+        await callback.answer(t("uz", "stale"), show_alert=True)
+        return
+    await callback.answer()
+    await callback.message.edit_text(
+        texts.ADMIN_REMOVE_CONFIRM.format(name=f"<b>{escape(name or str(callback_data.id))}</b>"),
+        reply_markup=kb.admin_remove_confirm(callback_data.id),
+    )
+
+
+@router.callback_query(kb.AdminsCb.filter(F.action == "del_ok"), IsOwner())
+async def admin_remove(
+    callback: CallbackQuery, callback_data: kb.AdminsCb, db: Database, config: Config, bot: Bot
+) -> None:
+    user_id = callback_data.id
+    if user_id in db.admin_ids:
+        await db.remove_admin(user_id)
+        if user_id not in config.admin_ids:
+            # Admin tugmasini menyudan olib tashlash uchun yangi menyu yuboramiz
+            user_lang = await db.get_lang(user_id) or "uz"
+            try:
+                await bot.send_message(
+                    user_id, texts.YOU_ARE_NOT_ADMIN, reply_markup=kb.main_menu(user_lang, False)
+                )
+            except TelegramAPIError:
+                pass
+    await callback.answer(texts.ADMIN_REMOVED)
+    text, markup = await _admins_view(db, config)
+    await callback.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(kb.AdminCb.filter(F.action == "stats"))
